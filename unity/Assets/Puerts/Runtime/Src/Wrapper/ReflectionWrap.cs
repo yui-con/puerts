@@ -50,7 +50,7 @@ namespace Puerts
     {
         private readonly int paramLength;
 
-        private readonly GeneralGetterManager generalGetterManager;
+        private readonly JsEnv jsEnv;
 
         private bool hasParamsArray = false;
 
@@ -70,9 +70,9 @@ namespace Puerts
 
         private GeneralSetter[] byRefValueSetFuncs = null;
 
-        public Parameters(ParameterInfo[] parameterInfos, GeneralGetterManager generalGetterManager, GeneralSetterManager generalSetterManager)
+        public Parameters(ParameterInfo[] parameterInfos, JsEnv jsEnv)
         {
-            this.generalGetterManager = generalGetterManager;
+            this.jsEnv = jsEnv;
             paramLength = parameterInfos.Length;
             paramJSTypeMasks = new JsValueType[parameterInfos.Length];
             paramTypes = new Type[parameterInfos.Length];
@@ -93,11 +93,11 @@ namespace Puerts
                 }
                 paramTypes[i] = parameterType.IsByRef ? parameterType.GetElementType() : parameterType;
                 paramJSTypeMasks[i] = GeneralGetterManager.GetJsTypeMask(parameterType);
-                argsTranslateFuncs[i] = generalGetterManager.GetTranslateFunc(parameterType);
+                argsTranslateFuncs[i] = jsEnv.GeneralGetterManager.GetTranslateFunc(parameterType);
                 paramIsByRef[i] = parameterType.IsByRef;
                 if (parameterType.IsByRef)
                 {
-                    byRefValueSetFuncs[i] = generalSetterManager.GetTranslateFunc(parameterType.GetElementType());
+                    byRefValueSetFuncs[i] = jsEnv.GeneralSetterManager.GetTranslateFunc(parameterType.GetElementType());
                 }
                 isOut[i] = parameterType.IsByRef && parameterInfo.IsOut && !parameterInfo.IsIn;
                 if (i < optionalParamPos && parameterInfo.IsOptional)
@@ -157,7 +157,7 @@ namespace Puerts
                             // 可能的优化： 为TypedValue设计一个新的JSValueType，这样这里就不需要先取值
                             if (jsCallInfo.Values[i] == null)
                             {
-                                jsCallInfo.Values[i] = generalGetterManager.AnyTranslator(generalGetterManager.jsEnv.Idx, jsCallInfo.Isolate, NativeValueApi.GetValueFromArgument, jsCallInfo.NativePtrs[i], paramIsByRef[i]);
+                                jsCallInfo.Values[i] = jsEnv.GeneralGetterManager.AnyTranslator(jsEnv.Idx, jsCallInfo.Isolate, NativeValueApi.GetValueFromArgument, jsCallInfo.NativePtrs[i], paramIsByRef[i]);
                             }
                             if (jsCallInfo.Values[i].GetType() == paramTypes[i])
                             {
@@ -173,7 +173,7 @@ namespace Puerts
                     {
                         if (jsCallInfo.Values[i] == null)
                         {
-                            jsCallInfo.Values[i] = generalGetterManager.AnyTranslator(generalGetterManager.jsEnv.Idx, jsCallInfo.Isolate, NativeValueApi.GetValueFromArgument, jsCallInfo.NativePtrs[i], paramIsByRef[i]);
+                            jsCallInfo.Values[i] = jsEnv.GeneralGetterManager.AnyTranslator(jsEnv.Idx, jsCallInfo.Isolate, NativeValueApi.GetValueFromArgument, jsCallInfo.NativePtrs[i], paramIsByRef[i]);
                         }
                         if (!paramTypes[i].IsAssignableFrom(jsCallInfo.Values[i].GetType()))
                         {
@@ -199,7 +199,7 @@ namespace Puerts
                     for (int j = i; j < callInfo.Length; j++)
                     {
                         paramArray.SetValue(
-                            translateFunc(generalGetterManager.jsEnv.Idx, callInfo.Isolate, NativeValueApi.GetValueFromArgument, callInfo.NativePtrs[j],
+                            translateFunc(jsEnv.Idx, callInfo.Isolate, NativeValueApi.GetValueFromArgument, callInfo.NativePtrs[j],
                                 false), j - i);
                     }
 
@@ -220,7 +220,7 @@ namespace Puerts
                         }
                         else
                         {
-                            args[i] = argsTranslateFuncs[i](generalGetterManager.jsEnv.Idx, callInfo.Isolate, NativeValueApi.GetValueFromArgument, callInfo.NativePtrs[i], paramIsByRef[i]);
+                            args[i] = argsTranslateFuncs[i](jsEnv.Idx, callInfo.Isolate, NativeValueApi.GetValueFromArgument, callInfo.NativePtrs[i], paramIsByRef[i]);
                         }
                     }
                 }
@@ -234,7 +234,7 @@ namespace Puerts
             {
                 if (paramIsByRef[i])
                 {
-                    byRefValueSetFuncs[i](generalGetterManager.jsEnv.Idx, callInfo.Isolate, NativeValueApi.SetValueToByRefArgument, callInfo.NativePtrs[i], args[i]);
+                    byRefValueSetFuncs[i](jsEnv.Idx, callInfo.Isolate, NativeValueApi.SetValueToByRefArgument, callInfo.NativePtrs[i], args[i]);
                 }
             }
         }
@@ -250,6 +250,8 @@ namespace Puerts
 
     public class OverloadReflectionWrap
     {
+        JsEnv jsEnv;
+
         Parameters parameters = null;
 
         MethodInfo methodInfo = null;
@@ -258,17 +260,14 @@ namespace Puerts
 
         Type type = null;
 
-
-        GeneralGetterManager generalGetterManager = null;
-
         GeneralSetter resultSetter = null;
+
         bool extensionMethod = false;
 
-        public OverloadReflectionWrap(MethodBase methodBase, GeneralGetterManager generalGetterManager, GeneralSetterManager generalSetterManager, bool extensionMethod = false)
+        public OverloadReflectionWrap(MethodBase methodBase, JsEnv jsEnv, bool extensionMethod = false)
         {
-            parameters = new Parameters(methodBase.GetParameters().Skip(extensionMethod ? 1 : 0).ToArray(), generalGetterManager, generalSetterManager);
+            parameters = new Parameters(methodBase.GetParameters().Skip(extensionMethod ? 1 : 0).ToArray(), jsEnv);
             
-            this.generalGetterManager = generalGetterManager;
             this.extensionMethod = extensionMethod;
 
             if (methodBase.IsConstructor)
@@ -278,17 +277,18 @@ namespace Puerts
             else
             {
                 methodInfo = methodBase as MethodInfo;
-                resultSetter = generalSetterManager.GetTranslateFunc(methodInfo.ReturnType);
+                resultSetter = jsEnv.GeneralSetterManager.GetTranslateFunc(methodInfo.ReturnType);
             }
+            this.jsEnv = jsEnv;
         }
 
         // 供struct的无参默认构造函数使用
-        public OverloadReflectionWrap(Type type, GeneralGetterManager generalGetterManager)
+        public OverloadReflectionWrap(Type type, JsEnv jsEnv)
         {
             ParameterInfo[] info = { };
-            parameters = new Parameters(info, generalGetterManager, null);
+            parameters = new Parameters(info, jsEnv);
 
-            this.generalGetterManager = generalGetterManager;
+            this.jsEnv = jsEnv;
 
             this.type = type;
         }
@@ -302,15 +302,15 @@ namespace Puerts
         {
             try
             {
-                object target = methodInfo.IsStatic ? null : generalGetterManager.GetSelf(jsCallInfo.Self);
+                object target = methodInfo.IsStatic ? null : jsEnv.GeneralGetterManager.GetSelf(jsEnv.Idx, jsCallInfo.Self);
                 object[] args = parameters.GetArguments(jsCallInfo);
                 if (this.extensionMethod)
                 {
-                    args = new object[] { generalGetterManager.GetSelf(jsCallInfo.Self) }.Concat(args).ToArray();
+                    args = new object[] { jsEnv.GeneralGetterManager.GetSelf(jsEnv.Idx, jsCallInfo.Self) }.Concat(args).ToArray();
                 }
                 object ret = methodInfo.Invoke(target, args);
                 parameters.FillByRefParameters(jsCallInfo);
-                resultSetter(generalGetterManager.jsEnv.Idx, jsCallInfo.Isolate, NativeValueApi.SetValueToResult, jsCallInfo.Info, ret);
+                resultSetter(jsEnv.Idx, jsCallInfo.Isolate, NativeValueApi.SetValueToResult, jsCallInfo.Info, ret);
             }
             finally
             {
@@ -336,11 +336,11 @@ namespace Puerts
 
         private int jsEnvIdx;
 
-        public DelegateConstructWrap(Type delegateType, GeneralGetterManager generalGetterManager)
+        public DelegateConstructWrap(Type delegateType, JsEnv jsEnv)
         {
             this.delegateType = delegateType;
-            translateFunc = generalGetterManager.GetTranslateFunc(delegateType);
-            jsEnvIdx = generalGetterManager.jsEnv.Idx;
+            translateFunc = jsEnv.GeneralGetterManager.GetTranslateFunc(delegateType);
+            jsEnvIdx = jsEnv.Idx;
         }
 
         public object Construct(IntPtr isolate, IntPtr info, int argumentsLen)
