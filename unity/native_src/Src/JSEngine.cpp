@@ -74,7 +74,7 @@ namespace puerts
                 printf("InitializeNodeWithArgs failed\n");
             }
         }
-        std::string Flags = "";
+        std::string Flags = "--max_old_space_size=4096";
 #if PUERTS_DEBUG
         Flags += "--expose-gc";
 #endif
@@ -157,7 +157,7 @@ namespace puerts
             v8::V8::Initialize();
         }
 
-        std::string Flags = "";
+        std::string Flags = "--max_old_space_size=4096";
 #if PUERTS_DEBUG
         Flags += "--expose-gc";
 #endif
