@@ -1,3 +1,4 @@
 BACKEND_ARTIFACT_NAME=v8_bin
 BACKEND_ARTIFACT_WORKFLOW=build_8.4.yml
 BACKEND_ARTIFACT_REPO=puerts/backend-v8
+BACKEND_URL=https://objects.githubusercontent.com/github-production-release-asset-2e65be/473088156/0884f1de-a18f-4233-882a-a99bbd960dca?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIWNJYAX4CSVEH53A%2F20221107%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20221107T130118Z&X-Amz-Expires=300&X-Amz-Signature=78ba127cef69b48a822b670d1890d8500502c3c7cb60d459857577f9a525428a&X-Amz-SignedHeaders=host&actor_id=108383093&key_id=0&repo_id=473088156&response-content-disposition=attachment%3B%20filename%3Dv8_bin_8.4.371.19.tgz&response-content-type=application%2Foctet-stream
