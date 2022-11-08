@@ -360,7 +360,7 @@ FJsEnvImpl::FJsEnvImpl(std::shared_ptr<IJSModuleLoader> InModuleLoader, std::sha
     GUObjectArray.AddUObjectDeleteListener(static_cast<FUObjectArray::FUObjectDeleteListener*>(this));
 
 #if PLATFORM_IOS
-    char Flags[] = "--jitless --no-expose-wasm";
+    char Flags[] = "--max_old_space_size=4096 --jitless --no-expose-wasm";
     v8::V8::SetFlagsFromString(Flags, sizeof(Flags));
 #endif
 
