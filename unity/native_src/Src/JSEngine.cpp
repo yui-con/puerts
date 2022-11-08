@@ -157,7 +157,7 @@ namespace puerts
             v8::V8::Initialize();
         }
 
-        std::string Flags = "--max_old_space_size=3072";
+        std::string Flags = "--max_old_space_size=2048";
 #if PUERTS_DEBUG
         Flags += "--expose-gc";
 #endif
